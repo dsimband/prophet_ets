@@ -9,14 +9,49 @@ create('/Users/davidsimbandumwe/dev/cuny/r-works/series/tsxls')
 use_git()
 
 
+use_r("strsplit1")
+document()
+
+# make all available
+load_all()
+
+
+# Install the package
+install()
+
+
+# setup tests
+use_testthat()
+use_test("strsplit1")
 
 
 
-use_git('./tsxls')
+# run test
+library(testthat)
+load_all()
+test()
 
-use_vignette("/Users/davidsimbandumwe/dev/cuny/r-works/series/tsxls")
 
-build_vignettes('/Users/davidsimbandumwe/dev/cuny/r-works/series/tsxls', quiet = FALSE)
+
+# setup vignette
+usethis::use_vignette("tsxls")
+devtools::install()
+devtools::build_rmd("vignettes/tsxls.Rmd")
+devtools::build()
+
+
+
+
+
+
+
+
+(x <- "alfa,bravo,charlie,delta")
+strsplit1(x, split = ",")
+
+
+
+
 
 
 
