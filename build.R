@@ -7,6 +7,8 @@ create('/Users/davidsimbandumwe/dev/cuny/r-works/series/tsxls')
 
 # setup git
 use_git()
+usethis::use_github_links()
+
 
 
 use_r("strsplit1")
