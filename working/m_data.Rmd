@@ -1,0 +1,151 @@
+---
+title: "M-Competition Data"
+author: "David Simbandumwe"
+date: "`r Sys.Date()`"
+output: openintro::lab_report
+---
+
+
+# Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list=ls())
+```
+
+
+
+
+```{r load-packages, message=FALSE}
+# library(tidyverse)
+# library(openintro)
+# library(dplyr)
+# library(plyr)
+# library(utils)
+
+
+library(tidyverse)
+library(tsibble)
+library(Mcomp)
+
+library(xlsx)
+library(openxlsx)
+
+
+```
+
+
+```{r}
+# force_Calculation_Excel_Formula <- function(file_name)
+# {
+#     library(excel.link)
+#     app <- xl.workbook.open(filename = file_name)
+#     app[["Statusbar"]] <- ""
+#     app[["Screenupdating"]] <- TRUE
+#     app[["Calculation"]] <- xl.constants$xlCalculationManual
+#     invisible(NULL)
+#     xl.workbook.save(filename_Save)
+#     xl.workbook.close()
+#     system("taskkill /IM Excel.exe")
+# }
+```
+
+
+
+
+```{r}
+
+fileName <- './data/m_indust.xlsx'
+
+
+```
+
+
+
+
+
+### Exercise 1
+
+Insert any text here.
+
+```{r}
+
+
+#subset(M1, "monthly")
+d <- subset(M1, "INDUST", "monthly")
+#dx <- data.frame(d_MRI1$x)
+
+train_tb <- as_tsibble(d$MRI1$x)
+names(train_tb) <- c('ds','y')
+train_tb$ds <- as.Date(train_tb$ds)
+train_rows <- nrow(train_tb)
+
+
+test_tb <- as_tsibble(d$MRI1$xx)
+names(test_tb) <- c('ds','y')
+test_rows <- nrow(test_tb)
+
+#new_data <- data.frame(test_tb)
+new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
+
+
+
+```
+
+
+
+```{r}
+
+# create base workbook
+wb <- createWorkbook()
+addWorksheet(wb, sheetName = "indust")
+writeData(wb, "indust", train_tb, colNames = TRUE)
+
+test_tb$ds <- as.Date(test_tb$ds)
+writeData(wb, "indust", test_tb, colNames = FALSE, startRow = train_rows+2)
+saveWorkbook(wb, file = fileName, overwrite = TRUE)
+
+```
+
+
+
+
+
+
+
+
+```{r}
+
+# add ETS formula
+v <- list()
+
+for (i in 1:test_rows) {
+   v[i] <- paste0("_xlfn.FORECAST.ETS(A",train_rows+i+1,",B2:B",train_rows+1,",A2:A",train_rows+1,",1)")
+ }
+writeFormula(wb, sheet = "indust", x = unlist(v) ,startCol = 2, startRow = train_rows+2)
+
+
+#wb$setForceFormulaRecalculation(TRUE)
+#wb$getCreationHelper()$createFormulaEvaluator()$evaluateAll() 
+#force_Calculation_Excel_Formula(fileName)
+#setForceFormulaRecalculation(wb, sheet = "indust", TRUE)
+saveWorkbook(wb, file = fileName, overwrite = TRUE)
+
+
+
+```
+
+
+
+
+```{r}
+
+
+wb2 <-openxlsx::read.xlsx(fileName, sheet = "indust", detectDates=TRUE)
+
+
+```
+
+
+
+
