@@ -19,8 +19,8 @@ rm(list=ls())
 ```{r load-packages, message=FALSE}
 # library(tidyverse)
 # library(openintro)
-# library(dplyr)
-# library(plyr)
+library(dplyr)
+library(plyr)
 # library(utils)
 
 
@@ -31,6 +31,9 @@ library(Mcomp)
 library(xlsx)
 library(openxlsx)
 
+library(yardstick)
+library(feasts)
+library(prophet)
 
 ```
 
@@ -70,6 +73,8 @@ Insert any text here.
 
 ```{r}
 
+
+freq <- 'months'
 
 #subset(M1, "monthly")
 d <- subset(M1, "INDUST", "monthly")
@@ -142,10 +147,135 @@ saveWorkbook(wb, file = fileName, overwrite = TRUE)
 
 
 wb2 <-openxlsx::read.xlsx(fileName, sheet = "indust", detectDates=TRUE)
+new_data <- wb2 %>% dplyr::slice((train_rows+1):(train_rows+test_rows))
+new_data$actual <- test_tb$y
+
+
+multi_metric <- metric_set(rmse, rsq, msd, mae, mpe, mape, smape, mase)
+m <- new_data %>%  multi_metric(truth=actual, estimate=y)
+m$model <- "xls_ets"
+m$value_round <- round(m$.estimate,3)
+
+```
+
+
+
+```{r}
+
+	plt <- ggplot() + geom_line(data = train_tb, aes(y=y, x=ds), color="darkgray") +
+			geom_line(data = new_data, aes(y=actual, x=ds), color="darkgray") + 
+			geom_line(data = new_data, aes(y=y, x=ds), color="steelblue", linetype="twodash") +
+			ggtitle('Prediction')
+	show(plt)
+	
+	plt <- ggplot() + geom_line(data = new_data, aes(y=actual, x=ds), color="darkgray") + 
+		geom_line(data = new_data, aes(y=y, x=ds), color="steelblue", linetype="twodash") +
+		ggtitle('Predictions')
+	show(plt)
+	
+	
+#m %>% dplyr::filter(.metric %in% c('mase')) %>%
+m %>%
+ggplot(aes(x=value_round, y=.metric, fill=.metric)) + 
+	geom_bar(stat = 'identity', position=position_dodge()) +
+	#facet_wrap(vars(dataset),scales = "free", ncol = 3) +
+	#coord_flip() +
+	ggtitle("Model Performance")
+
+```
+
+
+
+
+
+# Prophet
+
+```{r}
+
+	p_mdl <- NULL
+	p_mdl <- prophet()
+	p_mdl <- add_country_holidays(p_mdl, country_name = 'US')
+	p_mdl <- fit.prophet(p_mdl, train_tb)
+
+	future <- make_future_dataframe(p_mdl, periods = test_rows, freq = freq)
+	
+	forecast <- predict(p_mdl, future)
+	tail(forecast[c('ds', 'yhat', 'yhat_lower', 'yhat_upper')])
+	#prophet_plot_components(p_mdl, forecast)
+	
+	
+	predict_data <- forecast |> slice((train_rows+1):(train_rows+test_rows)) 
+	p_data <- predict_data |> select(yhat)
+	v_data <- test_tb |> select(y)
+	
+	
+	data_df <- data.frame(
+		predict =p_data$yhat,
+		actual = v_data$y,
+		ds = as.Date(predict_data$ds)
+		#ds = predict_data$ds
+	)
+	
+	
+	multi_metric <- metric_set(rmse, rsq, msd, mae, mpe, mape, smape, mase)
+	m0 <- data_df %>% multi_metric(truth=actual, estimate=predict)
+	m0$model <- "prophet"
+	m0$value_round <- round(m0$.estimate,3)
+
 
 
 ```
 
 
+
+```{r}
+
+	plt <- ggplot() + geom_line(data = train_tb, aes(y=y, x=ds), color="darkgray") +
+			geom_line(data = data_df, aes(y=actual, x=ds), color="darkgray") + 
+			geom_line(data = data_df, aes(y=predict, x=ds), color="steelblue", linetype="twodash") +
+			ggtitle('Prediction')
+	show(plt)
+	
+	plt <- ggplot() + geom_line(data = data_df, aes(y=actual, x=ds), color="darkgray") + 
+		geom_line(data = data_df, aes(y=predict, x=ds), color="steelblue", linetype="twodash") +
+		ggtitle('Predictions')
+	show(plt)
+	
+m0 %>%
+ggplot(aes(x=value_round, y=.metric, fill=.metric)) + 
+	geom_bar(stat = 'identity', position=position_dodge()) +
+	#facet_wrap(vars(dataset),scales = "free", ncol = 3) +
+	#coord_flip() +
+	ggtitle("Model Performance")
+
+
+```
+
+
+```{r}
+
+
+final_m_df <- rbind(m,m0)
+
+final_m_df %>% 
+	dplyr::filter(.metric %in% c('mape','rsq','acf1','mase','rmse','mae')) %>%
+	ggplot(aes(x=model, y=.metric, fill=value_round, label=value_round)) + 
+	geom_tile() + theme_bw() + 
+	geom_text(aes(label=value_round, size=.6), color="black", size=3) +
+	scale_fill_gradient(low = "lightgray", high = "red") + 
+	theme_light() +
+	ggtitle("Model Performance (Yardstick)")	
+
+final_m_df %>% 
+ggplot(aes(x=model, y=value_round, fill=model)) + 
+	geom_bar(stat = 'identity', position=position_dodge()) +
+	facet_wrap(vars(.metric),scales = "free", ncol = 3) +
+	coord_flip() +
+	ggtitle("Model Performance")
+
+
+
+
+```
 
 
