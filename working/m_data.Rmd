@@ -38,22 +38,6 @@ library(prophet)
 ```
 
 
-```{r}
-# force_Calculation_Excel_Formula <- function(file_name)
-# {
-#     library(excel.link)
-#     app <- xl.workbook.open(filename = file_name)
-#     app[["Statusbar"]] <- ""
-#     app[["Screenupdating"]] <- TRUE
-#     app[["Calculation"]] <- xl.constants$xlCalculationManual
-#     invisible(NULL)
-#     xl.workbook.save(filename_Save)
-#     xl.workbook.close()
-#     system("taskkill /IM Excel.exe")
-# }
-```
-
-
 
 
 ```{r}
@@ -137,9 +121,20 @@ writeFormula(wb, sheet = "indust", x = unlist(v) ,startCol = 2, startRow = train
 saveWorkbook(wb, file = fileName, overwrite = TRUE)
 
 
+n <- readline(prompt=paste0("open and save ", fileName ,": "))
+n
 
 ```
 
+
+
+
+
+```{r}
+
+sh1 <- read.xlsx(fileName, sheet = 'indust')
+
+```
 
 
 
@@ -278,4 +273,11 @@ ggplot(aes(x=model, y=value_round, fill=model)) +
 
 ```
 
+
+
+```{r}
+
+n <- readline(prompt=paste0("next ", fileName ,": "))
+
+```
 
