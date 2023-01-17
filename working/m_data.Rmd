@@ -31,6 +31,9 @@ library(yardstick)
 library(feasts)
 library(prophet)
 
+library(patchwork)
+
+
 ```
 
 
@@ -51,7 +54,7 @@ feqSet <- c("MONTHLY"="months")
 
 
 
-```{r functions}
+```{r functions, warning = F, echo = F}
 
 metricsEST_XLS <- function(new_data, modelName, datasetName, description,multi_metric) {
   
@@ -67,21 +70,25 @@ metricsEST_XLS <- function(new_data, modelName, datasetName, description,multi_m
 
 
 plotResults <- function(train_tb, new_data, modelName, datasetName, description, perfMetrics) {
-  plt <- ggplot() + geom_line(data = train_tb, aes(y=y, x=ds), color="darkgray") +
+  plt1 <- ggplot() + geom_line(data = train_tb, aes(y=y, x=ds), color="darkgray") +
   		geom_line(data = new_data, aes(y=actual, x=ds), color="darkgray") + 
   		geom_line(data = new_data, aes(y=y, x=ds), color="steelblue", linetype="twodash") +
   		ggtitle(paste0('Forecast',datasetName,'(',modelName,'): ', description))
-  show(plt)
+  #show(plt)
   
-  plt <- ggplot() + geom_line(data = new_data, aes(y=actual, x=ds), color="darkgray") + 
+  plt2 <- ggplot() + geom_line(data = new_data, aes(y=actual, x=ds), color="darkgray") + 
   	geom_line(data = new_data, aes(y=y, x=ds), color="steelblue", linetype="twodash") +
   	ggtitle(paste0('Forecast',datasetName,'(',modelName,'): ', description))
-  show(plt)
+  #show(plt)
   
-  plt <- ggplot(data=perfMetrics, aes(x=value_round, y=.metric, fill=.metric)) +
+  plt3 <- ggplot(data=perfMetrics, aes(x=value_round, y=.metric, fill=.metric)) +
     geom_bar(stat = 'identity', position=position_dodge()) +
     ggtitle(paste0('Model Performance',datasetName,'(',modelName,'): ', description))
-  show(plt)
+  #show(plt)
+  
+  suppressWarnings(
+    print(plt1 + plt2 + plt3 + plot_layout(ncol = 1))
+  )
   
 }
 
@@ -132,54 +139,36 @@ prophetModel <- function(train_tb,train_rows, test_rows, freq) {
 
 Insert any text here.
 
-```{r}
+```{r, warning = F}
 
 
-#freq <- 'months'
-
-#subset(M1, "monthly")
-#d <- subset(M1, "INDUST", "monthly")
 data_M1 <- subset(M1, "INDUST")
-#dx <- data.frame(d_MRI1$x)
+final_results_df <- data.frame(
+                        .metric = character(),
+                        .estimator = character(),
+                        .estimate = double(),
+                        model = character(),
+                        dataset = character(),
+                        description = character(),
+                        value_round = double()
+)
 
 
-for (i_ds in c('MRI1','MRI1')) {
+for (i_ds in c('MRI1','MRI5','MRI6','MRI7','MRI8','MRI9','MRI10','MNI13','MNI14'
+                ,'MNI15','MNI16','MNI17','MNI19','MNI21','MNI24','MNI165')) {
+
   d_set <- eval(parse(text=(paste0('data_M1$',i_ds))))
-  print(d_set$st)
-}
 
-
-# t <- eval(parse(text=(paste0('d$','MRI','1$x'))))
-# train_tb <- as_tsibble(t)
-
-for (i_ds in c('YAI6','MRI1')) {
-
-  d_set <- eval(parse(text=(paste0('data_M1$',i_ds))))
-
-  # freq <- as.character(feqSet[d_set$period])
-  # n <- d_set$n
-  # datasetName <- d_set$st 
-  # description <- d_set$description 
-  
-  # freq <- eval(parse(text=(paste0('d$','MRI',i_ds,'$period'))))
-  # freq <- as.character(feqSet[freq])
-  # n <- eval(parse(text=(paste0('d$','MRI',i_ds,'$n'))))
-  # datasetName <- eval(parse(text=(paste0('d$','MRI',i_ds,'$st'))))
-  # description <- eval(parse(text=(paste0('d$','MRI',i_ds,'$description'))))
-  
-  #t.x <- eval(parse(text=(paste0('d$','MRI',i_ds,'$x'))))
   train_tb <- as_tsibble(d_set$x)
   names(train_tb) <- c('ds','y')
   #train_tb$ds <- as.Date(train_tb$ds)
   train_tb$ds <- as.Date(train_tb$ds, origin='1964-10-22')
   train_rows <- nrow(train_tb)
   
-  #t.xx <- eval(parse(text=(paste0('d$','MRI',i_ds,'$xx'))))
   test_tb <- as_tsibble(d_set$xx)
   names(test_tb) <- c('ds','y')
   test_rows <- nrow(test_tb)
   
-  #new_data <- data.frame(test_tb)
   new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
   
   
@@ -211,12 +200,14 @@ for (i_ds in c('YAI6','MRI1')) {
     new_data <- wb2 %>% dplyr::slice((train_rows+1):(train_rows+test_rows))
     new_data$actual <- test_tb$y
     perfMetrics <- metricsEST_XLS(new_data, 'ets_xls', d_set$st, d_set$description, multi_metric)
+    final_results_df <- bind_rows(final_results_df, perfMetrics)
     plotResults(train_tb, new_data, 'ets_xls', d_set$st, d_set$description,perfMetrics)
     
     
     # prophet
     new_data <- prophetModel(train_tb,train_rows, test_rows, freq)
     perfMetrics <- metricsEST_XLS(new_data, 'prophet', d_set$st, d_set$description, multi_metric)
+    final_results_df <- bind_rows(final_results_df, perfMetrics)
     plotResults(train_tb, new_data, 'Prophet', d_set$st, d_set$description, perfMetrics)  
   }
 
@@ -231,17 +222,16 @@ for (i_ds in c('YAI6','MRI1')) {
 
 
 
+```{r}
+
+#w_flag = FALSE
+w_flag = TRUE
+if (w_flag) {
+	write.csv(final_results_df,file='./results/final_results-02.csv')
+}
 
 
-
-
-
-
-
-
-
-
-
+```
 
 
 
@@ -251,27 +241,56 @@ for (i_ds in c('YAI6','MRI1')) {
 
 ```{r}
 
-
-# final_m_df <- rbind(m,m0)
-# 
-# final_m_df %>% 
-# 	dplyr::filter(.metric %in% c('mape','rsq','acf1','mase','rmse','mae')) %>%
-# 	ggplot(aes(x=model, y=.metric, fill=value_round, label=value_round)) + 
-# 	geom_tile() + theme_bw() + 
-# 	geom_text(aes(label=value_round, size=.6), color="black", size=3) +
-# 	scale_fill_gradient(low = "lightgray", high = "red") + 
-# 	theme_light() +
-# 	ggtitle("Model Performance (Yardstick)")	
-# 
-# final_m_df %>% 
-# ggplot(aes(x=model, y=value_round, fill=model)) + 
-# 	geom_bar(stat = 'identity', position=position_dodge()) +
-# 	facet_wrap(vars(.metric),scales = "free", ncol = 3) +
-# 	coord_flip() +
-# 	ggtitle("Model Performance")
-
+r_flag = FALSE
+#r_flag = TRUE
+if (w_flag) {
+  result_df <- read_csv('./results/final_results-01.csv') 
+}
 
 
 
 ```
+
+
+
+```{r}
+
+result_df %>% dplyr::filter(.metric %in% c('mase','mape','rmse')) %>%
+ggplot(aes(x=model, y=value_round, fill=model)) + 
+	geom_bar(stat = 'identity', position=position_dodge()) +
+	facet_wrap(vars(dataset,.metric),scales = "free", ncol = 3) +
+	coord_flip() +
+	ggtitle("Model Performance")
+
+
+result_df %>% dplyr::filter(.metric %in% c('mase')) %>%
+ggplot(aes(x=model, y=value_round, fill=model)) + 
+	geom_bar(stat = 'identity', position=position_dodge()) +
+	facet_wrap(vars(dataset),scales = "free", ncol = 3) +
+	coord_flip() +
+	ggtitle("Model Performance (MASE)")
+
+result_df %>% dplyr::filter(.metric %in% c('mase') ) %>% 
+	#drop_na() %>%
+	group_by(model,.metric) %>%
+	summarise_at(vars(value_round), list(avg_value = mean)) %>%
+	ggplot(aes(x=model, y=avg_value, fill=model)) + 
+		geom_bar(stat = 'identity', position=position_dodge()) +
+		facet_wrap(vars(.metric),scales = "free", ncol = 3) +
+		coord_flip() +
+		ggtitle("Model Performance (MASE Avg)")
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
 
