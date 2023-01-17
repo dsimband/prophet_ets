@@ -8,7 +8,7 @@ output: openintro::lab_report
 
 # Setup
 
-```{r setup, include=FALSE}
+```{r init, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list=ls())
 ```
@@ -17,13 +17,9 @@ rm(list=ls())
 
 
 ```{r load-packages, message=FALSE}
-# library(tidyverse)
-# library(openintro)
+
 library(dplyr)
 library(plyr)
-# library(utils)
-
-
 library(tidyverse)
 library(tsibble)
 library(Mcomp)
@@ -40,12 +36,93 @@ library(prophet)
 
 
 
-```{r}
+```{r global_vars}
 
 fileName <- './data/m_indust.xlsx'
+sheetName <- 'indust'
+multi_metric <- metric_set(rmse, rsq, msd, mae, mpe, mape, smape, mase)
+
+
+feqSet <- c("MONTHLY"="months")
+
+```
+
+
+
+
+
+```{r functions}
+
+metricsEST_XLS <- function(new_data, modelName, datasetName, description,multi_metric) {
+  
+  multi_metric <- metric_set(rmse, rsq, msd, mae, mpe, mape, smape, mase)
+  m <- new_data %>%  multi_metric(truth=actual, estimate=y)
+  m$model <- modelName
+  m$dataset <- datasetName
+  m$description <- description
+  m$value_round <- round(m$.estimate,3)
+  
+  return(m)
+}
+
+
+plotResults <- function(train_tb, new_data, modelName, datasetName, description, perfMetrics) {
+  plt <- ggplot() + geom_line(data = train_tb, aes(y=y, x=ds), color="darkgray") +
+  		geom_line(data = new_data, aes(y=actual, x=ds), color="darkgray") + 
+  		geom_line(data = new_data, aes(y=y, x=ds), color="steelblue", linetype="twodash") +
+  		ggtitle(paste0('Forecast',datasetName,'(',modelName,'): ', description))
+  show(plt)
+  
+  plt <- ggplot() + geom_line(data = new_data, aes(y=actual, x=ds), color="darkgray") + 
+  	geom_line(data = new_data, aes(y=y, x=ds), color="steelblue", linetype="twodash") +
+  	ggtitle(paste0('Forecast',datasetName,'(',modelName,'): ', description))
+  show(plt)
+  
+  plt <- ggplot(data=perfMetrics, aes(x=value_round, y=.metric, fill=.metric)) +
+    geom_bar(stat = 'identity', position=position_dodge()) +
+    ggtitle(paste0('Model Performance',datasetName,'(',modelName,'): ', description))
+  show(plt)
+  
+}
+
+
+
+prophetModel <- function(train_tb,train_rows, test_rows, freq) {
+  
+	p_mdl <- NULL
+	p_mdl <- prophet()
+	p_mdl <- add_country_holidays(p_mdl, country_name = 'US')
+	p_mdl <- fit.prophet(p_mdl, train_tb)
+
+	#future <- make_future_dataframe(p_mdl, periods = test_rows, freq = freq)
+	future <- make_future_dataframe(p_mdl, periods = test_rows, freq = "months")
+	
+	forecast <- predict(p_mdl, future)
+	tail(forecast[c('ds', 'yhat', 'yhat_lower', 'yhat_upper')])
+	#prophet_plot_components(p_mdl, forecast)
+	
+	predict_data <- forecast |> slice((train_rows+1):(train_rows+test_rows)) 
+	p_data <- predict_data |> select(yhat)
+	v_data <- test_tb |> select(y)
+	
+	
+	data_df <- data.frame(
+		y =p_data$yhat,
+		actual = v_data$y,
+		ds = as.Date(predict_data$ds)
+		#ds = predict_data$ds
+	)
+	
+	return(data_df)
+
+
+}
+
+
 
 
 ```
+
 
 
 
@@ -58,24 +135,79 @@ Insert any text here.
 ```{r}
 
 
-freq <- 'months'
+#freq <- 'months'
 
 #subset(M1, "monthly")
 d <- subset(M1, "INDUST", "monthly")
 #dx <- data.frame(d_MRI1$x)
 
-train_tb <- as_tsibble(d$MRI1$x)
-names(train_tb) <- c('ds','y')
-train_tb$ds <- as.Date(train_tb$ds)
-train_rows <- nrow(train_tb)
 
 
-test_tb <- as_tsibble(d$MRI1$xx)
-names(test_tb) <- c('ds','y')
-test_rows <- nrow(test_tb)
+t <- eval(parse(text=(paste0('d$','MRI','1$x'))))
+train_tb <- as_tsibble(t)
 
-#new_data <- data.frame(test_tb)
-new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
+for (i_ds in 1:16) {
+
+  
+  freq <- eval(parse(text=(paste0('d$','MRI',i_ds,'$period'))))
+  freq <- as.character(feqSet[freq])
+  n <- eval(parse(text=(paste0('d$','MRI',i_ds,'$n'))))
+  datasetName <- eval(parse(text=(paste0('d$','MRI',i_ds,'$st'))))
+  description <- eval(parse(text=(paste0('d$','MRI',i_ds,'$description'))))
+  
+  t.x <- eval(parse(text=(paste0('d$','MRI',i_ds,'$x'))))
+  train_tb <- as_tsibble(t.x)
+  names(train_tb) <- c('ds','y')
+  train_tb$ds <- as.Date(train_tb$ds)
+  train_rows <- nrow(train_tb)
+  
+  t.xx <- eval(parse(text=(paste0('d$','MRI',i_ds,'$xx'))))
+  test_tb <- as_tsibble(t.xx)
+  names(test_tb) <- c('ds','y')
+  test_rows <- nrow(test_tb)
+  
+  #new_data <- data.frame(test_tb)
+  new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
+  
+  
+  if ( n > 99 ) {
+  
+    # create base workbook
+    wb <- createWorkbook()
+    addWorksheet(wb, sheetName = "indust")
+    writeData(wb, "indust", train_tb, colNames = TRUE)
+    
+    test_tb$ds <- as.Date(test_tb$ds)
+    writeData(wb, "indust", test_tb, colNames = FALSE, startRow = train_rows+2)
+    saveWorkbook(wb, file = fileName, overwrite = TRUE)
+    
+    
+    # add ETS formula
+    v <- list()
+    for (i in 1:test_rows) {
+       v[i] <- paste0("_xlfn.FORECAST.ETS(A",train_rows+i+1,",B2:B",train_rows+1,",A2:A",train_rows+1,",1)")
+     }
+    writeFormula(wb, sheet = "indust", x = unlist(v) ,startCol = 2, startRow = train_rows+2)
+    saveWorkbook(wb, file = fileName, overwrite = TRUE)
+    n <- readline(prompt=paste0("open and save ", fileName ,": "))
+    n
+    
+  
+    # ets_xls
+    wb2 <-openxlsx::read.xlsx(fileName, sheet = sheetName, detectDates=TRUE)
+    new_data <- wb2 %>% dplyr::slice((train_rows+1):(train_rows+test_rows))
+    new_data$actual <- test_tb$y
+    perfMetrics <- metricsEST_XLS(new_data, 'ets_xls', datasetName, description, multi_metric)
+    plotResults(train_tb, new_data, 'ets_xls', datasetName, description,perfMetrics)
+    
+    
+    # prophet
+    new_data <- prophetModel(train_tb,train_rows, test_rows, freq)
+    perfMetrics <- metricsEST_XLS(new_data, 'prophet', datasetName, description, multi_metric)
+    plotResults(train_tb, new_data, 'Prophet', datasetName, description, perfMetrics)  
+  }
+
+}
 
 
 
@@ -83,19 +215,6 @@ new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
 
 
 
-```{r}
-
-# create base workbook
-wb <- createWorkbook()
-addWorksheet(wb, sheetName = "indust")
-writeData(wb, "indust", train_tb, colNames = TRUE)
-
-test_tb$ds <- as.Date(test_tb$ds)
-writeData(wb, "indust", test_tb, colNames = FALSE, startRow = train_rows+2)
-saveWorkbook(wb, file = fileName, overwrite = TRUE)
-
-
-```
 
 
 
@@ -104,55 +223,14 @@ saveWorkbook(wb, file = fileName, overwrite = TRUE)
 
 
 
-```{r}
-
-# add ETS formula
-v <- list()
-
-for (i in 1:test_rows) {
-   v[i] <- paste0("_xlfn.FORECAST.ETS(A",train_rows+i+1,",B2:B",train_rows+1,",A2:A",train_rows+1,",1)")
- }
-writeFormula(wb, sheet = "indust", x = unlist(v) ,startCol = 2, startRow = train_rows+2)
-
-
-#wb$setForceFormulaRecalculation(TRUE)
-#wb$getCreationHelper()$createFormulaEvaluator()$evaluateAll() 
-#force_Calculation_Excel_Formula(fileName)
-#setForceFormulaRecalculation(wb, sheet = "indust", TRUE)
-saveWorkbook(wb, file = fileName, overwrite = TRUE)
-
-
-n <- readline(prompt=paste0("open and save ", fileName ,": "))
-n
-
-```
 
 
 
 
 
-```{r}
-
-sh1 <- read.xlsx(fileName, sheet = 'indust')
-
-```
 
 
 
-```{r}
-
-
-wb2 <-openxlsx::read.xlsx(fileName, sheet = "indust", detectDates=TRUE)
-new_data <- wb2 %>% dplyr::slice((train_rows+1):(train_rows+test_rows))
-new_data$actual <- test_tb$y
-
-
-multi_metric <- metric_set(rmse, rsq, msd, mae, mpe, mape, smape, mase)
-m <- new_data %>%  multi_metric(truth=actual, estimate=y)
-m$model <- "xls_ets"
-m$value_round <- round(m$.estimate,3)
-
-```
 
 
 
@@ -179,6 +257,9 @@ ggplot(aes(x=value_round, y=.metric, fill=.metric)) +
 	ggtitle("Model Performance")
 
 ```
+
+
+
 
 
 
@@ -213,14 +294,15 @@ ggplot(aes(x=value_round, y=.metric, fill=.metric)) +
 	)
 	
 	
-	multi_metric <- metric_set(rmse, rsq, msd, mae, mpe, mape, smape, mase)
-	m0 <- data_df %>% multi_metric(truth=actual, estimate=predict)
-	m0$model <- "prophet"
-	m0$value_round <- round(m0$.estimate,3)
+
 
 
 
 ```
+
+
+
+
 
 
 
@@ -246,6 +328,9 @@ ggplot(aes(x=value_round, y=.metric, fill=.metric)) +
 
 
 ```
+
+
+
 
 
 ```{r}
