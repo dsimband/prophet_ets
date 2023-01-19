@@ -56,7 +56,7 @@ feqSet <- c("MONTHLY"="months",
 
 
 set.seed(808)
-test.size <- 5
+test.size <- 20
 M_M4 <- Filter(function(l) l$type == "Industry", M4)
 n.m4 <- length(M_M4)
 indices.m4 <- sample(x=n.m4, size=test.size, replace=FALSE)
@@ -123,7 +123,7 @@ plotResults <- function(train_tb, new_data, modelName, datasetName, n, perfMetri
   
   plt3 <- ggplot(data=perfMetrics, aes(x=value_round, y=.metric, fill=.metric)) +
     coord_flip() + 
-    geom_bar(stat = 'identity', position=position_dodge()) 
+    geom_bar(stat = 'identity', width=0.5 ,position=position_dodge()) 
 
   
   titleStr <- paste0('Forecast ',datasetName,'(',modelName,'):', n )
@@ -182,9 +182,6 @@ prophetModel <- function(train_tb,train_rows, test_rows, new_data) {
 
 ```{r}
 
-#data_M1 <- subset(M1, "INDUST")
-
-
 # create workbook for Excel ETS Models
 wb <- createWorkbook()
 
@@ -209,9 +206,9 @@ for (d_set in M_M4[indices.m4]) {
   # manage dates with different frequencies
   if (freq == 'quarter') {
      
-    train_tb$ds <- yearquarter(train_tb$ds)
+    train_tb$ds <- as.Date(train_tb$ds)
     train_tb <-  train_tb %>% as_tsibble(index = ds)
-    test_tb$ds <- yearquarter(test_tb$ds)
+    test_tb$ds <- as.Date(test_tb$ds)
     test_tb <-  test_tb %>% as_tsibble(index = ds)
     new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
     
@@ -226,9 +223,9 @@ for (d_set in M_M4[indices.m4]) {
     
   } else if (freq == 'week') {
     
-    train_tb$ds <- yearweek(train_tb$ds)
+    train_tb$ds <- as.Date(train_tb$ds)
     train_tb <-  train_tb %>% as_tsibble(index = ds)
-    test_tb$ds <- yearweek(test_tb$ds)
+    test_tb$ds <- as.Date(test_tb$ds)
     test_tb <-  test_tb %>% as_tsibble(index = ds)
     new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
   
@@ -247,8 +244,6 @@ for (d_set in M_M4[indices.m4]) {
   # add worksheet
   addWorksheet(wb, sheetName = d_set$st)
   writeData(wb, d_set$st, train_tb, colNames = TRUE)
-  
-  #test_tb$ds <- as.Date(test_tb$ds)
   writeData(wb, d_set$st, test_tb, colNames = FALSE, startRow = train_rows+2)
   
   # add ETS formula
@@ -293,7 +288,6 @@ for (d_set in M_M4[indices.m4]) {
 
 
   freq <- as.character(feqSet[as.character(d_set$period)])
-  
   
   train_tb <- as_tsibble(d_set$x)
   names(train_tb) <- c('ds','y')
@@ -422,7 +416,7 @@ if (w_flag) {
 
 result_df %>% dplyr::filter(.metric %in% c('mase','mape','rmse')) %>%
 ggplot(aes(x=model, y=value_round, fill=model)) + 
-	geom_bar(stat = 'identity', position=position_dodge()) +
+	geom_bar(stat = 'identity', width=0.5, position=position_dodge()) +
 	facet_wrap(vars(dataset,.metric),scales = "free", ncol = 3) +
 	coord_flip() +
 	ggtitle("Model Performance")
@@ -430,7 +424,7 @@ ggplot(aes(x=model, y=value_round, fill=model)) +
 
 result_df %>% dplyr::filter(.metric %in% c('mase')) %>%
 ggplot(aes(x=model, y=value_round, fill=model)) + 
-	geom_bar(stat = 'identity', position=position_dodge()) +
+	geom_bar(stat = 'identity', width=0.5, position=position_dodge()) +
 	facet_wrap(vars(dataset),scales = "free", ncol = 3) +
 	coord_flip() +
 	ggtitle("Model Performance (MASE)")
@@ -438,7 +432,7 @@ ggplot(aes(x=model, y=value_round, fill=model)) +
 
 result_df %>% dplyr::filter(.metric %in% c('mape')) %>%
 ggplot(aes(x=model, y=value_round, fill=model)) + 
-	geom_bar(stat = 'identity', position=position_dodge()) +
+	geom_bar(stat = 'identity', width=0.5, position=position_dodge()) +
 	facet_wrap(vars(dataset),scales = "free", ncol = 3) +
 	coord_flip() +
 	ggtitle("Model Performance (MAPE)")
@@ -448,7 +442,7 @@ result_df %>% dplyr::filter(.metric %in% c('mase','mape') ) %>%
 	group_by(model,.metric) %>%
 	summarise_at(vars(value_round), list(avg_value = mean)) %>%
 	ggplot(aes(x=model, y=avg_value, fill=model)) + 
-		geom_bar(stat = 'identity', position=position_dodge()) +
+		geom_bar(stat = 'identity', width=0.5,position=position_dodge()) +
 		facet_wrap(vars(.metric),scales = "free", ncol = 3) +
 		ggtitle("Model Performance (MASE/MAPE Avg)")
 
