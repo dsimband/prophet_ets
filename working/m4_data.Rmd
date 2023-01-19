@@ -42,7 +42,7 @@ library(M4comp2018)
 
 fileName <- './data/m_indust.xlsx'
 #multi_metric <- metric_set(rmse, rsq, mae, mpe, mape, smape, mase)
-multi_metric <- metric_set(mape, smape, mase, mpe)
+multi_metric <- metric_set(mape, smape, mase, mpe, rmse)
 
 
 feqSet <- c("MONTHLY"="months",
@@ -152,7 +152,7 @@ plotResults <- function(train_tb, new_data, modelName, datasetName, n, perfMetri
 prophetModel <- function(train_tb,train_rows, test_rows, new_data) {
 
   # train model
-  fit <- train_tb %>% model(arima = ARIMA(y))
+  fit <- train_tb %>% model(fprophet = fable.prophet::prophet(y))
 
   # predict
   fc <- fit %>% forecast(new_data = new_data)
@@ -168,6 +168,38 @@ prophetModel <- function(train_tb,train_rows, test_rows, new_data) {
   
 }
 
+
+
+
+#' arimaModel
+#'
+#' @param train_tb 
+#' @param train_rows 
+#' @param test_rows 
+#' @param new_data 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+arimaModel <- function(train_tb,train_rows, test_rows, new_data) {
+
+  # train model
+  fit <- train_tb %>% model(arima = ARIMA(y))
+
+  # predict
+  fc <- fit %>% forecast(new_data = new_data)
+  
+  
+  data_df <- data.frame(
+    y =fc$.mean,
+    actual = new_data$y,
+    ds = new_data$ds
+  )
+	
+	return(data_df)
+  
+}
 
 
 ```
@@ -347,10 +379,22 @@ for (d_set in M_M4[indices.m4]) {
   
   
   # prophet
-  data_prophet <- prophetModel(train_tb,train_rows, test_rows, new_data)
-  perfMetrics <- calculateMetrics(data_prophet, 'prophet', d_set$st, multi_metric)
+  tryCatch({
+    data_prophet <- prophetModel(train_tb,train_rows, test_rows, new_data)
+    perfMetrics <- calculateMetrics(data_prophet, 'prophet', d_set$st, multi_metric)
+    final_results_df <- bind_rows(final_results_df, perfMetrics)
+    plotResults(train_tb, data_prophet, 'Prophet', d_set$st, d_set$n, perfMetrics)  
+  }, error=function(e) { 
+    message(e)
+    message(paste0('*** ',d_set$st,': (',freq,' - ' ,d_set$n,')'))
+  })
+  
+  
+  # ARIMA
+  data_arima <- arimaModel(train_tb,train_rows, test_rows, new_data)
+  perfMetrics <- calculateMetrics(data_arima, 'ARIMA', d_set$st, multi_metric)
   final_results_df <- bind_rows(final_results_df, perfMetrics)
-  plotResults(train_tb, data_prophet, 'Prophet', d_set$st, d_set$n, perfMetrics)  
+  plotResults(train_tb, data_prophet, 'ARIMA', d_set$st, d_set$n, perfMetrics)  
     
 
 
@@ -397,12 +441,12 @@ if (w_flag) {
 ```{r}
 
 
-result_df %>% dplyr::filter(.metric %in% c('mase','mape','rmse')) %>%
+result_df %>% dplyr::filter(.metric %in% c('rmse')) %>%
 ggplot(aes(x=model, y=value_round, fill=model)) + 
 	geom_bar(stat = 'identity', width=0.3, position=position_dodge()) +
 	facet_wrap(vars(dataset,.metric),scales = "free", ncol = 3) +
 	coord_flip() +
-	ggtitle("Model Performance")
+	ggtitle("Model Performance (RMSE)")
 
 
 result_df %>% dplyr::filter(.metric %in% c('mase')) %>%
@@ -421,12 +465,12 @@ ggplot(aes(x=model, y=value_round, fill=model)) +
 	ggtitle("Model Performance (MAPE)")
 
 
-result_df %>% dplyr::filter(.metric %in% c('mase','mape','smape') ) %>% 
+result_df %>% dplyr::filter(.metric %in% c('mase','mape','smape','rmse') ) %>% 
 	group_by(model,.metric) %>%
 	summarise_at(vars(value_round), list(avg_value = mean)) %>%
 	ggplot(aes(x=model, y=avg_value, fill=model)) + 
 		geom_bar(stat = 'identity', width=0.3,position=position_dodge()) +
-		facet_wrap(vars(.metric),scales = "free", ncol = 3) +
+		facet_wrap(vars(.metric),scales = "free", ncol = 4) +
 		ggtitle("Model Performance (MASE/MAPE/SMAPE Avg)")
 
 
@@ -437,6 +481,44 @@ result_df %>% dplyr::filter(.metric %in% c('mase','mape','smape') ) %>%
 
 
 
+```{r}
+
+ds_list <- result_df %>% filter(model == 'prophet') %>% select(dataset) %>% distinct()
+
+result_df %>% dplyr::filter(.metric %in% c('rmse') & dataset %in% ds_list$dataset) %>%
+ggplot(aes(x=model, y=value_round, fill=model)) + 
+	geom_bar(stat = 'identity', width=0.3, position=position_dodge()) +
+	facet_wrap(vars(dataset,.metric),scales = "free", ncol = 3) +
+	coord_flip() +
+	ggtitle("Model Performance (RMSE)")
+
+
+result_df %>% dplyr::filter(.metric %in% c('mase') & dataset %in% ds_list$dataset) %>% 
+ggplot(aes(x=model, y=value_round, fill=model)) + 
+	geom_bar(stat = 'identity', width=0.3, position=position_dodge()) +
+	facet_wrap(vars(dataset),scales = "free", ncol = 3) +
+	coord_flip() +
+	ggtitle("Model Performance (MASE)")
+
+
+result_df %>% dplyr::filter(.metric %in% c('mape') & dataset %in% ds_list$dataset) %>%
+ggplot(aes(x=model, y=value_round, fill=model)) + 
+	geom_bar(stat = 'identity', width=0.3, position=position_dodge()) +
+	facet_wrap(vars(dataset),scales = "free", ncol = 3) +
+	coord_flip() +
+	ggtitle("Model Performance (MAPE)")
+
+
+result_df %>% dplyr::filter(.metric %in% c('mase','mape','smape','rmse') & dataset %in% ds_list$dataset ) %>% 
+	group_by(model,.metric) %>%
+	summarise_at(vars(value_round), list(avg_value = mean)) %>%
+	ggplot(aes(x=model, y=avg_value, fill=model)) + 
+		geom_bar(stat = 'identity', width=0.3,position=position_dodge()) +
+		facet_wrap(vars(.metric),scales = "free", ncol = 4) +
+		ggtitle("Model Performance (MASE/MAPE/SMAPE Avg)")
+
+
+```
 
 
 
