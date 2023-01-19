@@ -85,19 +85,17 @@ indices.m4 <- sample(x=n.m4, size=test.size, replace=FALSE)
 #' @param new_data 
 #' @param modelName 
 #' @param datasetName 
-#' @param description 
 #' @param multi_metric 
 #'
 #' @return dataframe with the performance measurements
 #' @export
 #'
 #' @examples
-metricsEST_XLS <- function(new_data, modelName, datasetName, description,multi_metric) {
+metricsEST_XLS <- function(new_data, modelName, datasetName, multi_metric) {
   
   m <- as.data.frame(new_data) %>% dplyr::select(actual,y) %>%  multi_metric(truth=actual, estimate=y)
   m$model <- modelName
   m$dataset <- datasetName
-  m$description <- description
   m$value_round <- round(m$.estimate,3)
   
   return(m)
@@ -111,14 +109,14 @@ metricsEST_XLS <- function(new_data, modelName, datasetName, description,multi_m
 #' @param new_data 
 #' @param modelName 
 #' @param datasetName 
-#' @param description 
+#' @param n 
 #' @param perfMetrics 
 #'
 #' @return NULL
 #' @export
 #'
 #' @examples
-plotResults <- function(train_tb, new_data, modelName, datasetName, description, perfMetrics) {
+plotResults <- function(train_tb, new_data, modelName, datasetName, n, perfMetrics) {
 
     plt1 <- ggplot() + geom_line(data = train_tb, aes(y=y, x=ds), color="darkgray") +
   		geom_line(data = new_data, aes(y=actual, x=ds), color="darkgray") + 
@@ -132,7 +130,7 @@ plotResults <- function(train_tb, new_data, modelName, datasetName, description,
     geom_bar(stat = 'identity', position=position_dodge()) 
 
   
-  titleStr <- paste0('Forecast ',datasetName,'(',modelName,'): ', description)
+  titleStr <- paste0('Forecast ',datasetName,'(',modelName,'):', n )
   suppressWarnings(
     print( ((plt1 / plt2) | plt3) + plot_annotation(title =titleStr))
   )
@@ -240,10 +238,11 @@ wb <- createWorkbook()
 for (d_set in M_M4[indices.m4]) {
 
   #d_set <- eval(parse(text=(paste0('data_M1$',i_ds))))
+  freq <- as.character(feqSet[as.character(d_set$period)])
 
   train_tb <- as_tsibble(d_set$x)
   names(train_tb) <- c('ds','y')
-  train_tb$ds <- as.Date(train_tb$ds, origin='1964-10-22')
+  #train_tb$ds <- as.Date(train_tb$ds, origin='1964-10-22')
   train_rows <- nrow(train_tb)
   
   test_tb <- as_tsibble(d_set$xx)
@@ -253,13 +252,63 @@ for (d_set in M_M4[indices.m4]) {
   new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
   
   
-  if ( d_set$n > 99 ) {
+  
+  
+    if (freq == 'quarter') {
+     
+    train_tb$ds <- yearquarter(train_tb$ds)
+    train_tb <-  train_tb %>% as_tsibble(index = ds)
+    test_tb$ds <- yearquarter(test_tb$ds)
+    test_tb <-  test_tb %>% as_tsibble(index = ds)
+    #new_data$ds <- yearquarter(new_data$ds)
+    new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
+    
+    
+   } else if (freq == 'months') {
+    
+    #train_tb$ds <- yearmonth(train_tb$ds)
+    train_tb$ds <- as.Date(train_tb$ds)
+    train_tb <-  train_tb %>% as_tsibble(index = ds)
+    #test_tb$ds <- yearmonth(test_tb$ds)
+    test_tb$ds <- as.Date(test_tb$ds)
+    test_tb <-  test_tb %>% as_tsibble(index = ds)
+    #new_data$ds <- yearmonth(new_data$ds)
+    new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
+    
+  } else if (freq == 'week') {
+    
+    train_tb$ds <- yearweek(train_tb$ds)
+    train_tb <-  train_tb %>% as_tsibble(index = ds)
+    test_tb$ds <- yearweek(test_tb$ds)
+    test_tb <-  test_tb %>% as_tsibble(index = ds)
+    #new_data$ds <- yearweek(new_data$ds)
+    new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
+  
+  } else if (freq == 'day') {  
+    
+    train_tb$ds <- ymd(train_tb$ds)
+    train_tb <-  train_tb %>% as_tsibble(index = ds)
+    test_tb$ds <- ymd(test_tb$ds)
+    test_tb <-  test_tb %>% as_tsibble(index = ds)
+    #new_data$ds <- ymd(new_data$ds)
+    new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
+    
+  }  
+  
+  
+  
+  
+  
+  
+  
+  
+  if ( d_set$n > 2 ) {
     
     # add worksheet
     addWorksheet(wb, sheetName = d_set$st)
     writeData(wb, d_set$st, train_tb, colNames = TRUE)
     
-    test_tb$ds <- as.Date(test_tb$ds)
+    #test_tb$ds <- as.Date(test_tb$ds)
     writeData(wb, d_set$st, test_tb, colNames = FALSE, startRow = train_rows+2)
     
     # add ETS formula
@@ -294,7 +343,6 @@ final_results_df <- data.frame(
                         .estimate = double(),
                         model = character(),
                         dataset = character(),
-                        description = character(),
                         value_round = double()
 )
 
@@ -330,7 +378,7 @@ for (d_set in M_M4[indices.m4]) {
     train_tb <-  train_tb %>% as_tsibble(index = ds)
     test_tb$ds <- yearquarter(test_tb$ds)
     test_tb <-  test_tb %>% as_tsibble(index = ds)
-    new_data$ds <- yearquarter(new_data$ds)
+    #new_data$ds <- yearquarter(new_data$ds)
     new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
     
     
@@ -340,7 +388,7 @@ for (d_set in M_M4[indices.m4]) {
     train_tb <-  train_tb %>% as_tsibble(index = ds)
     test_tb$ds <- yearmonth(test_tb$ds)
     test_tb <-  test_tb %>% as_tsibble(index = ds)
-    new_data$ds <- yearmonth(new_data$ds)
+    #new_data$ds <- yearmonth(new_data$ds)
     new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
     
   } else if (freq == 'week') {
@@ -349,7 +397,7 @@ for (d_set in M_M4[indices.m4]) {
     train_tb <-  train_tb %>% as_tsibble(index = ds)
     test_tb$ds <- yearweek(test_tb$ds)
     test_tb <-  test_tb %>% as_tsibble(index = ds)
-    new_data$ds <- yearweek(new_data$ds)
+    #new_data$ds <- yearweek(new_data$ds)
     new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
   
   } else if (freq == 'day') {  
@@ -358,13 +406,13 @@ for (d_set in M_M4[indices.m4]) {
     train_tb <-  train_tb %>% as_tsibble(index = ds)
     test_tb$ds <- ymd(test_tb$ds)
     test_tb <-  test_tb %>% as_tsibble(index = ds)
-    new_data$ds <- ymd(new_data$ds)
+    #new_data$ds <- ymd(new_data$ds)
     new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
     
   } 
   
   
-  if ( d_set$n > 99 ) {
+  if ( d_set$n > 2 ) {
   
     # ets_xls
     sh1 <-readWorkbook(wb, sheet = d_set$st, detectDates=TRUE)
@@ -382,17 +430,17 @@ for (d_set in M_M4[indices.m4]) {
     }
     
     new_data <- new_data %>% as_tsibble(index = ds)
-    perfMetrics <- metricsEST_XLS(new_data, 'ets_xls', d_set$st, d_set$description, multi_metric)
+    perfMetrics <- metricsEST_XLS(new_data, 'ets_xls', d_set$st, multi_metric)
     final_results_df <- bind_rows(final_results_df, perfMetrics)
-    plotResults(train_tb, new_data, 'ets_xls', d_set$st, d_set$description,perfMetrics)
+    plotResults(train_tb, new_data, 'ets_xls', d_set$st, d_set$n, perfMetrics)
     
     
     # prophet
     #new_data <- prophetModel(train_tb,train_rows, test_rows, freq)
     new_data <- prophetModel(train_tb,train_rows, test_rows, new_data)
-    perfMetrics <- metricsEST_XLS(new_data, 'prophet', d_set$st, d_set$description, multi_metric)
+    perfMetrics <- metricsEST_XLS(new_data, 'prophet', d_set$st, multi_metric)
     final_results_df <- bind_rows(final_results_df, perfMetrics)
-    plotResults(train_tb, new_data, 'Prophet', d_set$st, d_set$description, perfMetrics)  
+    plotResults(train_tb, new_data, 'Prophet', d_set$st, d_set$n, perfMetrics)  
     
     
   }
