@@ -152,7 +152,7 @@ plotResults <- function(train_tb, new_data, modelName, datasetName, n, perfMetri
 prophetModel <- function(train_tb,train_rows, test_rows, new_data) {
 
   # train model
-  fit <- train_tb %>% model(fprophet = fable.prophet::prophet(y))
+  fit <- train_tb %>% model(fprophet = fable.prophet::prophet(y, algorithm='LBFGS'))
 
   # predict
   fc <- fit %>% forecast(new_data = new_data)
@@ -394,7 +394,7 @@ for (d_set in M_M4[indices.m4]) {
   data_arima <- arimaModel(train_tb,train_rows, test_rows, new_data)
   perfMetrics <- calculateMetrics(data_arima, 'ARIMA', d_set$st, multi_metric)
   final_results_df <- bind_rows(final_results_df, perfMetrics)
-  plotResults(train_tb, data_prophet, 'ARIMA', d_set$st, d_set$n, perfMetrics)  
+  plotResults(train_tb, data_arima, 'ARIMA', d_set$st, d_set$n, perfMetrics)  
     
 
 
@@ -444,7 +444,7 @@ if (w_flag) {
 result_df %>% dplyr::filter(.metric %in% c('rmse')) %>%
 ggplot(aes(x=model, y=value_round, fill=model)) + 
 	geom_bar(stat = 'identity', width=0.3, position=position_dodge()) +
-	facet_wrap(vars(dataset,.metric),scales = "free", ncol = 3) +
+	facet_wrap(vars(dataset),scales = "free", ncol = 3) +
 	coord_flip() +
 	ggtitle("Model Performance (RMSE)")
 
@@ -488,7 +488,7 @@ ds_list <- result_df %>% filter(model == 'prophet') %>% select(dataset) %>% dist
 result_df %>% dplyr::filter(.metric %in% c('rmse') & dataset %in% ds_list$dataset) %>%
 ggplot(aes(x=model, y=value_round, fill=model)) + 
 	geom_bar(stat = 'identity', width=0.3, position=position_dodge()) +
-	facet_wrap(vars(dataset,.metric),scales = "free", ncol = 3) +
+	facet_wrap(vars(dataset),scales = "free", ncol = 3) +
 	coord_flip() +
 	ggtitle("Model Performance (RMSE)")
 

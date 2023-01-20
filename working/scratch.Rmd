@@ -1,0 +1,377 @@
+---
+title: "M-Competition Data"
+author: "David Simbandumwe"
+date: "`r Sys.Date()`"
+output: openintro::lab_report
+---
+
+
+# Setup
+
+```{r init, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list=ls())
+```
+
+
+
+
+```{r load-packages, message=FALSE}
+
+library(dplyr)
+#library(plyr)
+library(tidyverse)
+library(tsibble)
+#library(Mcomp)
+
+#library(xlsx)
+library(openxlsx)
+
+library(fable)
+library(fabletools)
+library(yardstick)
+#library(feasts)
+library(prophet)
+library(lubridate)
+
+library(patchwork)
+library(M4comp2018)
+
+
+
+```
+
+
+
+```{r}
+
+# library(rstan)
+# library(rstantools)
+# library(prophet)
+# sessionInfo()
+
+```
+
+
+
+
+```{r}
+
+f_n <- 'https://github.com/Mcompetitions/M4-methods/blob/master/Dataset/M4-info.csv?raw=true'
+lib_df <- read_csv(f_n)
+
+```
+
+
+
+
+```{r global_vars}
+
+fileName <- './data/m_indust.xlsx'
+#multi_metric <- metric_set(rmse, rsq, mae, mpe, mape, smape, mase)
+multi_metric <- metric_set(mape, smape, mase, mpe)
+
+#ds_lst <- c('MRI1','MRI5','MRI6','MRI7','MRI8','MRI9','MRI10','MNI13','MNI14'
+#                ,'MNI15','MNI16','MNI17','MNI19','MNI21','MNI24','MNI165')
+
+
+feqSet <- c("MONTHLY"="months",
+            "Monthly"="months",
+            "Yearly"="year",
+            "Quarterly"="quarter",
+            "Weekly"="week",
+            "Daily"="daily",
+            "Hourly"="hour"
+            )
+
+
+set.seed(808)
+test.size <- 5
+M_M4 <- Filter(function(l) l$type == "Industry", M4)
+n.m4 <- length(M_M4)
+indices.m4 <- sample(x=n.m4, size=test.size, replace=FALSE)
+
+
+
+```
+
+
+
+
+
+
+```{r}
+
+# M_sub <- Filter(function(l)  l$period == 'Hourly', M4)
+# 
+# M_sub[[12]]$st
+# 
+# d_set <- Filter(function(l) l$st == "H12", M4)[[1]] 
+# d_set$period
+
+
+#d_set <- M_M4[[3]]  #Yearly
+#d_set <- Filter(function(l) l$st == "Y14803", M4)[[1]]  #Yearly
+d_set <- Filter(function(l) l$st == "Y12774", M4)[[1]]  #Yearly
+#d_set <- Filter(function(l) l$st == "Q13205", M4)[[1]]  #Quarterly
+#d_set <- Filter(function(l) l$st == "M26731", M4)[[1]] #Monthly
+#d_set <- Filter(function(l) l$st == "M33412", M4)[[1]] #Monthly
+# d_set <- Filter(function(l) l$st == "W57", M4)[[1]]   #Weekly
+# d_set <- Filter(function(l) l$st == "D1617", M4)[[1]]   #Daily
+
+
+
+freq <- as.character(feqSet[as.character(d_set$period)])
+
+
+train_tb <- as_tsibble(d_set$x)
+names(train_tb) <- c('ds','y')
+train_tb <-  train_tb %>% update_tsibble(index = ds)
+train_rows <- nrow(train_tb)
+
+test_tb <- as_tsibble(d_set$xx)
+names(test_tb) <- c('ds','y')
+test_tb <-  test_tb %>% update_tsibble(index = ds)
+test_rows <- nrow(test_tb)
+
+new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
+
+
+
+ if (freq == 'quarter') {
+   
+  train_tb$ds <- yearquarter(train_tb$ds)
+  train_tb <-  train_tb %>% as_tsibble(index = ds)
+  test_tb$ds <- yearquarter(test_tb$ds)
+  test_tb <-  test_tb %>% as_tsibble(index = ds)
+  new_data$ds <- yearquarter(new_data$ds)
+  new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
+  
+  
+ } else if (freq == 'month') {
+  
+  train_tb$ds <- yearmonth(train_tb$ds)
+  train_tb <-  train_tb %>% as_tsibble(index = ds)
+  test_tb$ds <- yearmonth(test_tb$ds)
+  test_tb <-  test_tb %>% as_tsibble(index = ds)
+  new_data$ds <- yearmonth(new_data$ds)
+  new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
+  
+} else if (freq == 'week') {
+  
+  train_tb$ds <- yearweek(train_tb$ds)
+  train_tb <-  train_tb %>% as_tsibble(index = ds)
+  test_tb$ds <- yearweek(test_tb$ds)
+  test_tb <-  test_tb %>% as_tsibble(index = ds)
+  new_data$ds <- yearweek(new_data$ds)
+  new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
+
+} else if (freq == 'day') {  
+  
+  train_tb$ds <- ymd(train_tb$ds)
+  train_tb <-  train_tb %>% as_tsibble(index = ds)
+  test_tb$ds <- ymd(test_tb$ds)
+  test_tb <-  test_tb %>% as_tsibble(index = ds)
+  new_data$ds <- ymd(new_data$ds)
+  new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
+  
+} else if (freq == 'year') {  
+  
+  train_tb$ds <- ymd(train_tb$ds,truncated = 2)
+  train_tb <-  train_tb %>% as_tsibble(index = ds)
+  test_tb$ds <- ymd(test_tb$ds, truncated = 2)
+  test_tb <-  test_tb %>% as_tsibble(index = ds)
+  new_data <- test_tb %>% as_tsibble(index = ds)
+  
+  
+} 
+  
+
+#origin_dt <- min(train_tb$ds)
+#typeof(year(ymd(1957, truncated = 2)))
+
+
+
+```
+
+
+
+
+```{r}
+
+# library(fpp3)
+# aus_production
+# 
+# 
+# 
+# tb <- tsibble(
+#   Year = 2015:2019,
+#   Observation = c(123, 39, 78, 52, 110),
+#   index = Year
+# )
+
+
+
+```
+
+
+
+
+```{r}
+
+#fit <- train_tb %>% model(arima = ARIMA(y))
+fit <- train_tb %>% model(fprophet = fable.prophet::prophet(y, algorithm='LBFGS' ))
+#fit <- train_tb %>% model(fprophet = fable.prophet::prophet(y ~ season(period="year"), algorithm='LBFGS' ))
+fc <- fit %>% forecast(new_data = new_data)
+
+
+data_df <- data.frame(
+	y =fc$.mean,
+	actual = new_data$y,
+	#ds = as.Date(predict_data$ds) 
+	ds = new_data$ds
+)
+
+m <- data_df %>%  multi_metric(truth=actual, estimate=y)
+m$model <- 'modelName'
+m$dataset <- 'datasetName'
+m$description <- 'description'
+m$value_round <- round(m$.estimate,3)
+
+
+result_df <- m
+
+
+
+
+```
+
+
+
+```{r}
+
+
+
+```
+
+
+
+
+```{r}
+
+# 	p_mdl <- NULL
+#   p_mdl <- prophet()
+# 	#p_mdl <- prophet(algorithm='LBFGS')
+# 	#p_mdl <- prophet(algorithm='Newton')
+# 	p_mdl <- add_country_holidays(p_mdl, country_name = 'US')
+# 	p_mdl <- fit.prophet(p_mdl, train_tb, algorithm='LBFGS')
+# 
+# 	# predict prophet model
+# 	future <- make_future_dataframe(p_mdl, periods = test_rows, freq = freq)
+# 	forecast <- predict(p_mdl, future, )
+# 	tail(forecast[c('ds', 'yhat', 'yhat_lower', 'yhat_upper')])
+# 	#prophet_plot_components(p_mdl, forecast)
+# 	
+# 	
+# 	
+# 	predict_data <- forecast |> slice((train_rows+1):(train_rows+test_rows)) 
+# 	p_data <- predict_data |> select(yhat)
+# 	
+# 	
+# 	data_df <- data.frame(
+# 		y = predict_data$yhat,
+# 		actual = test_tb$y,
+# 		ds = test_tb$ds
+# 	)
+# 
+# 
+#   m <- data_df %>%  multi_metric(truth=actual, estimate=y)
+#   m$model <- 'modelName'
+#   m$dataset <- 'datasetName'
+#   m$description <- 'description'
+#   m$value_round <- round(m$.estimate,3)
+#   
+#   
+#   result_df <- m
+	
+	
+	
+```
+
+
+
+
+```{r}
+
+    plt1 <- ggplot() + geom_line(data = train_tb, aes(y=y, x=ds), color="darkgray") +
+  		geom_line(data = data_df, aes(y=actual, x=ds), color="darkgray") + 
+  		geom_line(data = data_df, aes(y=y, x=ds), color="steelblue", linetype="twodash") 
+  
+  plt2 <- ggplot() + geom_line(data = data_df, aes(y=actual, x=ds), color="darkgray") + 
+  	geom_line(data = data_df, aes(y=y, x=ds), color="steelblue", linetype="twodash") 
+  
+  plt3 <- ggplot(data=result_df, aes(x=value_round, y=.metric, fill=.metric)) +
+    coord_flip() + 
+    geom_bar(stat = 'identity', position=position_dodge()) 
+
+  
+titleStr <- paste0('Forecast ')
+  suppressWarnings(
+    print( ((plt1 / plt2) | plt3) + plot_annotation(title =titleStr))
+  )
+
+
+```
+
+
+
+
+```{r}
+
+
+result_df %>% dplyr::filter(.metric %in% c('mase','mape','rmse')) %>%
+ggplot(aes(x=model, y=value_round, fill=model)) + 
+	geom_bar(stat = 'identity', position=position_dodge()) +
+	facet_wrap(vars(dataset,.metric),scales = "free", ncol = 3) +
+	coord_flip() +
+	ggtitle("Model Performance")
+
+
+result_df %>% dplyr::filter(.metric %in% c('mase')) %>%
+ggplot(aes(x=model, y=value_round, fill=model)) + 
+	geom_bar(stat = 'identity', position=position_dodge()) +
+	facet_wrap(vars(dataset),scales = "free", ncol = 3) +
+	coord_flip() +
+	ggtitle("Model Performance (MASE)")
+
+
+result_df %>% dplyr::filter(.metric %in% c('mape')) %>%
+ggplot(aes(x=model, y=value_round, fill=model)) + 
+	geom_bar(stat = 'identity', position=position_dodge()) +
+	facet_wrap(vars(dataset),scales = "free", ncol = 3) +
+	coord_flip() +
+	ggtitle("Model Performance (MAPE)")
+
+
+result_df %>% dplyr::filter(.metric %in% c('mase','mape') ) %>% 
+	group_by(model,.metric) %>%
+	summarise_at(vars(value_round), list(avg_value = mean)) %>%
+	ggplot(aes(x=model, y=avg_value, fill=model)) + 
+		geom_bar(stat = 'identity', position=position_dodge()) +
+		facet_wrap(vars(.metric),scales = "free", ncol = 3) +
+		ggtitle("Model Performance (MASE/MAPE Avg)")
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
