@@ -378,23 +378,41 @@ for (d_set in M_M4[indices.m4]) {
   plotResults(train_tb, data_ets, 'ets_xls', d_set$st, d_set$n, perfMetrics)
   
   
-  # prophet
-  tryCatch({
-    data_prophet <- prophetModel(train_tb,train_rows, test_rows, new_data)
-    perfMetrics <- calculateMetrics(data_prophet, 'prophet', d_set$st, multi_metric)
-    final_results_df <- bind_rows(final_results_df, perfMetrics)
-    plotResults(train_tb, data_prophet, 'Prophet', d_set$st, d_set$n, perfMetrics)  
-  }, error=function(e) { 
-    message(e)
-    message(paste0('*** ',d_set$st,': (',freq,' - ' ,d_set$n,')'))
-  })
-  
   
   # ARIMA
   data_arima <- arimaModel(train_tb,train_rows, test_rows, new_data)
   perfMetrics <- calculateMetrics(data_arima, 'ARIMA', d_set$st, multi_metric)
   final_results_df <- bind_rows(final_results_df, perfMetrics)
   plotResults(train_tb, data_arima, 'ARIMA', d_set$st, d_set$n, perfMetrics)  
+  
+  
+  if (freq == 'year') {
+    
+    train_tb$ds <- ymd(train_tb$ds,truncated = 2)
+    train_tb <-  train_tb %>% as_tsibble(index = ds)
+    test_tb$ds <- ymd(test_tb$ds, truncated = 2)
+    test_tb <-  test_tb %>% as_tsibble(index = ds)
+    new_data <- test_tb %>% as_tsibble(index = ds)
+    
+  }
+  
+  
+  
+  # prophet
+  tryCatch({
+    
+    data_prophet <- prophetModel(train_tb,train_rows, test_rows, new_data)
+    perfMetrics <- calculateMetrics(data_prophet, 'prophet', d_set$st, multi_metric)
+    final_results_df <- bind_rows(final_results_df, perfMetrics)
+    plotResults(train_tb, data_prophet, 'Prophet', d_set$st, d_set$n, perfMetrics)  
+    
+  }, error=function(e) { 
+    message(e)
+    message(paste0('*** ',d_set$st,': (',freq,' - ' ,d_set$n,')'))
+  })
+  
+  
+
     
 
 
