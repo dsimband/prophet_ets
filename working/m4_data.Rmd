@@ -315,7 +315,6 @@ for (d_set in M_M4[indices.m4]) {
   test_rows <- nrow(test_tb)
   
   new_data <- test_tb %>% select(ds,y) #%>% as_tsibble(index = ds)
-  #new_data <- data.frame(test_tb)
   
   
   
@@ -376,7 +375,6 @@ for (d_set in M_M4[indices.m4]) {
   perfMetrics <- calculateMetrics(data_ets, 'ets_xls', d_set$st, multi_metric)
   final_results_df <- bind_rows(final_results_df, perfMetrics)
   plotResults(train_tb, data_ets, 'ets_xls', d_set$st, d_set$n, perfMetrics)
-  
   
   
   # ARIMA
