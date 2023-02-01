@@ -28,6 +28,7 @@ library(fable)
 library(fabletools)
 library(yardstick)
 library(prophet)
+library(lubridate)
 
 library(patchwork)
 library(M4comp2018)
@@ -121,7 +122,8 @@ plotResults <- function(train_tb, new_data, modelName, datasetName, n, perfMetri
   plt2 <- ggplot() + geom_line(data = new_data, aes(y=actual, x=ds), color="darkgray") + 
   	geom_line(data = new_data, aes(y=y, x=ds), color="steelblue", linetype="twodash") 
   
-  plt3 <- ggplot(data=perfMetrics, aes(x=value_round, y=.metric, fill=.metric)) +
+  plt3 <- perfMetrics %>% dplyr::filter(.metric != 'rmse') %>%
+    ggplot(aes(x=value_round, y=.metric, fill=.metric)) +
     coord_flip() + 
     geom_bar(stat = 'identity', width=0.3 ,position=position_dodge()) 
 
@@ -244,14 +246,14 @@ for (d_set in M_M4[indices.m4]) {
     new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
     
   } else if (freq == 'day') {
-    
+
     train_tb$ds <- ymd(train_tb$ds)
     train_tb <-  train_tb %>% as_tsibble(index = ds)
     test_tb$ds <- ymd(test_tb$ds)
     test_tb <-  test_tb %>% as_tsibble(index = ds)
     new_data <- test_tb %>% select(ds,y) %>% as_tsibble(index = ds)
     
-   }
+  }
   
   
   
@@ -383,15 +385,15 @@ for (d_set in M_M4[indices.m4]) {
   final_results_df <- bind_rows(final_results_df, perfMetrics)
   plotResults(train_tb, data_arima, 'ARIMA', d_set$st, d_set$n, perfMetrics)  
   
-  
+
   if (freq == 'year') {
-    
+
     train_tb$ds <- ymd(train_tb$ds,truncated = 2)
     train_tb <-  train_tb %>% as_tsibble(index = ds)
     test_tb$ds <- ymd(test_tb$ds, truncated = 2)
     test_tb <-  test_tb %>% as_tsibble(index = ds)
     new_data <- test_tb %>% as_tsibble(index = ds)
-    
+
   }
   
   
@@ -430,7 +432,7 @@ for (d_set in M_M4[indices.m4]) {
 #w_flag = FALSE
 w_flag = TRUE
 if (w_flag) {
-	write.csv(final_results_df,file='./results/final_results-04.csv')
+	write.csv(final_results_df,file='./results/final_results-05.csv')
 }
 
 
@@ -446,8 +448,8 @@ if (w_flag) {
 
 #r_flag = FALSE
 r_flag = TRUE
-if (w_flag) {
-  result_df <- read_csv('./results/final_results-04.csv') 
+if (r_flag) {
+  result_df <- read_csv('./results/final_results-05.csv') 
 }
 
 ```
@@ -517,12 +519,12 @@ ggplot(aes(x=model, y=value_round, fill=model)) +
 	ggtitle("Model Performance (MASE)")
 
 
-result_df %>% dplyr::filter(.metric %in% c('mape') & dataset %in% ds_list$dataset) %>%
+result_df %>% dplyr::filter(.metric %in% c('smape') & dataset %in% ds_list$dataset) %>%
 ggplot(aes(x=model, y=value_round, fill=model)) + 
 	geom_bar(stat = 'identity', width=0.3, position=position_dodge()) +
 	facet_wrap(vars(dataset),scales = "free", ncol = 3) +
 	coord_flip() +
-	ggtitle("Model Performance (MAPE)")
+	ggtitle("Model Performance (sMAPE)")
 
 
 result_df %>% dplyr::filter(.metric %in% c('mase','mape','smape','rmse') & dataset %in% ds_list$dataset ) %>% 
@@ -539,5 +541,66 @@ result_df %>% dplyr::filter(.metric %in% c('mase','mape','smape','rmse') & datas
 
 
 
+```{r}
+
+result_df %>% dplyr::filter(.metric %in% c('smape') & dataset %in% ds_list$dataset & value_round < 20) %>%
+ggplot(aes(x=model, y=value_round, fill=model)) + 
+	geom_bar(stat = 'identity', width=0.3, position=position_dodge()) +
+	facet_wrap(vars(dataset),scales = "free", ncol = 3) +
+	coord_flip() +
+	ggtitle("Model Performance (sMAPE)")
+
+result_df %>% dplyr::filter(.metric %in% c('mase','mape','smape','rmse') & 
+                              dataset %in% ds_list$dataset & 
+                              value_round < 20 ) %>% 
+	group_by(model,.metric) %>%
+	summarise_at(vars(value_round), list(avg_value = mean)) %>%
+	ggplot(aes(x=model, y=avg_value, fill=model)) + 
+		geom_bar(stat = 'identity', width=0.3,position=position_dodge()) +
+		facet_wrap(vars(.metric),scales = "free", ncol = 4) +
+		ggtitle("Model Performance (MASE/MAPE/SMAPE Avg)")
+
+```
+
+
+
+
+```{r}
+
+r_df <- result_df
+r_df$freq <- substr(result_df$dataset, 1, 1) 
+r_df <- r_df %>% group_by(model,freq,.metric) %>% summarise(mean = mean(.estimate)) %>% dplyr::filter(.metric == 'smape')
+r_df$project <- 'ds'
+r_df$model[r_df$model == 'ets_xls'] <- 'ETS'
+
+  
+r_m4_df <- data.frame(
+            'model' = c('ARIMA','ARIMA','ARIMA','ARIMA','ARIMA','ETS','ETS','ETS','ETS','ETS'),
+            'freq'= c('D','W','M','Q','Y','D','W','M','Q','Y'),
+            '.metric'= c('smape','smape','smape','smape','smape','smape','smape','smape','smape','smape'),
+            'mean'= c(3.193,8.653,13.443,10.431,15.168,3.046,8.727,13.525,10.291,15.356)
+)
+r_m4_df$project <- 'm4'
+
+
+
+r_df <- bind_rows(r_df, r_m4_df)
+
+
+r_df %>% dplyr::filter(freq %in% c('M','Q','Y') & !model %in% c('prophet') ) %>%
+	ggplot(aes(x=model, y=mean, fill=project)) + 
+		geom_bar(stat = 'identity', width=0.3,position=position_dodge()) +
+		facet_wrap(vars(freq),scales = "free", ncol = 3) +
+    #coord_flip() +
+		ggtitle("Model Performance vs M4")
+
+
+r_df %>% dplyr::filter(project == 'ds') %>%
+	ggplot(aes(x=model, y=mean, fill=model)) + 
+		geom_bar(stat = 'identity', width=0.3,position=position_dodge()) +
+		facet_wrap(vars(freq),scales = "free", ncol = 4) +
+		ggtitle("Model Performance (by freq)")
+
+```
 
 
