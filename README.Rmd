@@ -1,28 +1,29 @@
 ---
-title: "tsxls"
-date: "`r Sys.Date()`"
-output: rmarkdown::html_vignette
-pkgdown:
- as_is: false
-vignette: >
-  %\VignetteIndexEntry{tsxls}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
+output:
+  github_document:
+    html_preview: true
+always_allow_html: true
+editor_options: 
+  chunk_output_type: console
 ---
 
+```{r setup, include = FALSE}
+library(dplyr)
 
-```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
 )
-```
+options(digits = 2)
 
-
-
-```{r setup}
 library(tsxls)
+
+
 ```
+
+# `tsxls`: Time Series XLS
 
 
 **Contact: [David Simbandumwe](mailto:david.simbandumwe19@spsmail.cuny.edu)**    
@@ -31,15 +32,20 @@ library(tsxls)
 
 The goal of this package is to explore the performance of various time series models.
 
+
 ## Installation
 
 You can install the development version of `tsxls` using the `remotes` package like so:
 
-``` r
+```{r}
 remotes::install_github('dsimband/tsxls')
 ```
 
 
+
+```{r, eval=FALSE}
+vignette('installation', package = 'tsxls')
+```
 
 
 

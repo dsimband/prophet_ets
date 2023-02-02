@@ -42,14 +42,11 @@ devtools::build_rmd("vignettes/tsxls.Rmd")
 devtools::build()
 
 
+pkgdown::build_site()
 
 
 
 
-
-
-(x <- "alfa,bravo,charlie,delta")
-strsplit1(x, split = ",")
 
 
 

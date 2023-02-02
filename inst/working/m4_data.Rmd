@@ -41,7 +41,7 @@ library(M4comp2018)
 
 ```{r global_vars}
 
-fileName <- './data/m_indust.xlsx'
+fileName <- './inst/data/m_indust.xlsx'
 #multi_metric <- metric_set(rmse, rsq, mae, mpe, mape, smape, mase)
 multi_metric <- metric_set(mape, smape, mase, mpe, rmse)
 
@@ -468,7 +468,7 @@ for (d_set in M_M4[indices.m4]) {
 #w_flag = FALSE
 w_flag = TRUE
 if (w_flag) {
-	write.csv(final_results_df,file='./results/final_results-05.csv')
+	write.csv(final_results_df,file='./inst/results/final_results-05.csv')
 }
 
 
@@ -485,7 +485,7 @@ if (w_flag) {
 #r_flag = FALSE
 r_flag = TRUE
 if (r_flag) {
-  result_df <- read_csv('./results/final_results-05.csv') 
+  result_df <- read_csv('./inst/results/final_results-05.csv') 
 }
 
 ```
@@ -589,6 +589,21 @@ result_df %>% dplyr::filter(.metric %in% c('mase','mape','smape','rmse') & datas
 		geom_bar(stat = 'identity', width=0.3,position=position_dodge()) +
 		facet_wrap(vars(.metric),scales = "free", ncol = 4) +
 		ggtitle("Model Performance (MASE/MAPE/SMAPE Avg)")
+
+
+result_df %>% dplyr::filter(.metric %in% c('mase','mape','smape','rmse') & dataset %in% ds_list$dataset ) %>% 
+  ggplot(aes(x=reorder(model,value_round), y=value_round, fill=model)) +
+	coord_flip() +
+    geom_boxplot() +
+	stat_summary(fun.y="mean", size=1, geom = "point", aes(color="Mean"))+
+	stat_summary(fun.y="median", size=1, geom = "point", aes(color="Median"))+
+	#scale_y_continuous(labels = scales::comma) +
+  facet_wrap(vars(.metric),scales = "free", ncol = 2) +
+	labs(
+	    x = 'Industry', 
+	    y = 'Revenue per Employees', 
+	    title = 'Distribution of Employees (by Industry)'
+	)
 
 
 ```
