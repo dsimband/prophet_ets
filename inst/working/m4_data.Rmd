@@ -57,7 +57,7 @@ feqSet <- c("MONTHLY"="months",
 
 
 set.seed(808)
-test.size <- 20
+test.size <- 40
 M_M4 <- Filter(function(l) l$type == "Industry", M4)
 n.m4 <- length(M_M4)
 indices.m4 <- sample(x=n.m4, size=test.size, replace=FALSE)
@@ -558,18 +558,18 @@ result_df %>% dplyr::filter(.metric %in% c('mase','mape','smape','rmse') ) %>%
 
 ds_list <- result_df %>% filter(model == 'prophet') %>% select(dataset) %>% distinct()
 
-result_df %>% dplyr::filter(.metric %in% c('rmse') & dataset %in% ds_list$dataset) %>%
-ggplot(aes(x=model, y=value_round, fill=model)) + 
-	geom_bar(stat = 'identity', width=0.3, position=position_dodge()) +
-	facet_wrap(vars(dataset),scales = "free", ncol = 3) +
-	coord_flip() +
-	ggtitle("Model Performance (RMSE)")
+# result_df %>% dplyr::filter(.metric %in% c('rmse') & dataset %in% ds_list$dataset) %>%
+# ggplot(aes(x=model, y=value_round, fill=model)) + 
+# 	geom_bar(stat = 'identity', width=0.3, position=position_dodge()) +
+# 	facet_wrap(vars(dataset),scales = "free", ncol = 5) +
+# 	coord_flip() +
+# 	ggtitle("Model Performance (RMSE)")
 
 
 result_df %>% dplyr::filter(.metric %in% c('mase') & dataset %in% ds_list$dataset) %>% 
 ggplot(aes(x=model, y=value_round, fill=model)) + 
 	geom_bar(stat = 'identity', width=0.3, position=position_dodge()) +
-	facet_wrap(vars(dataset),scales = "free", ncol = 3) +
+	facet_wrap(vars(dataset),scales = "free", ncol = 5) +
 	coord_flip() +
 	ggtitle("Model Performance (MASE)")
 
@@ -577,33 +577,39 @@ ggplot(aes(x=model, y=value_round, fill=model)) +
 result_df %>% dplyr::filter(.metric %in% c('smape') & dataset %in% ds_list$dataset) %>%
 ggplot(aes(x=model, y=value_round, fill=model)) + 
 	geom_bar(stat = 'identity', width=0.3, position=position_dodge()) +
-	facet_wrap(vars(dataset),scales = "free", ncol = 3) +
+	facet_wrap(vars(dataset),scales = "free", ncol = 5) +
 	coord_flip() +
 	ggtitle("Model Performance (sMAPE)")
 
 
-result_df %>% dplyr::filter(.metric %in% c('mase','mape','smape','rmse') & dataset %in% ds_list$dataset ) %>% 
+result_df %>% dplyr::filter(.metric %in% c('mase','smape') & dataset %in% ds_list$dataset ) %>% 
+#result_df %>% dplyr::filter(.metric %in% c('mase','mape','smape','rmse') & dataset %in% ds_list$dataset ) %>% 
 	group_by(model,.metric) %>%
 	summarise_at(vars(value_round), list(avg_value = mean)) %>%
 	ggplot(aes(x=model, y=avg_value, fill=model)) + 
 		geom_bar(stat = 'identity', width=0.3,position=position_dodge()) +
-		facet_wrap(vars(.metric),scales = "free", ncol = 4) +
-		ggtitle("Model Performance (MASE/MAPE/SMAPE Avg)")
+		facet_wrap(vars(.metric),scales = "free", ncol = 5) +
+		#ggtitle("Model Performance (MASE/MAPE/SMAPE Avg)")
+  	labs(
+  	    x = 'performance', 
+  	    y = 'model', 
+  	    title = 'Model Performance (MASE/SMAPE)'
+  	)
 
-
-result_df %>% dplyr::filter(.metric %in% c('mase','mape','smape','rmse') & dataset %in% ds_list$dataset ) %>% 
+result_df %>% dplyr::filter(.metric %in% c('mase','smape') & dataset %in% ds_list$dataset ) %>% 
+#result_df %>% dplyr::filter(.metric %in% c('mase','mape','smape','rmse') & dataset %in% ds_list$dataset ) %>% 
   ggplot(aes(x=reorder(model,value_round), y=value_round, fill=model)) +
-	coord_flip() +
-    geom_boxplot() +
-	stat_summary(fun.y="mean", size=1, geom = "point", aes(color="Mean"))+
-	stat_summary(fun.y="median", size=1, geom = "point", aes(color="Median"))+
-	#scale_y_continuous(labels = scales::comma) +
-  facet_wrap(vars(.metric),scales = "free", ncol = 2) +
-	labs(
-	    x = 'Industry', 
-	    y = 'Revenue per Employees', 
-	    title = 'Distribution of Employees (by Industry)'
-	)
+  	#coord_flip() +
+    geom_boxplot(width=0.3) +
+  	stat_summary(fun="mean", size=1, geom = "point", aes(color="Mean"))+
+  	stat_summary(fun="median", size=1, geom = "point", aes(color="Median"))+
+  	#scale_y_continuous(labels = scales::comma) +
+    facet_wrap(vars(.metric),scales = "free", ncol = 4) +
+  	labs(
+  	    x = 'performance', 
+  	    y = 'model', 
+  	    title = 'Model Performance (MASE/SMAPE)'
+  	)
 
 
 ```
@@ -613,22 +619,42 @@ result_df %>% dplyr::filter(.metric %in% c('mase','mape','smape','rmse') & datas
 
 ```{r}
 
-result_df %>% dplyr::filter(.metric %in% c('smape') & dataset %in% ds_list$dataset & value_round < 20) %>%
+
+t_df <- result_df %>% filter(.metric %in% c('mase','smape')) %>%
+                  group_by(model, .metric) %>% filter(!(abs(value_round - median(value_round)) > 1.5*IQR(value_round)))
+
+t_df %>% dplyr::filter(.metric %in% c('smape') & dataset %in% ds_list$dataset & value_round < 20) %>%
 ggplot(aes(x=model, y=value_round, fill=model)) + 
 	geom_bar(stat = 'identity', width=0.3, position=position_dodge()) +
-	facet_wrap(vars(dataset),scales = "free", ncol = 3) +
+	facet_wrap(vars(dataset),scales = "free", ncol = 5) +
 	coord_flip() +
 	ggtitle("Model Performance (sMAPE)")
 
-result_df %>% dplyr::filter(.metric %in% c('mase','mape','smape','rmse') & 
-                              dataset %in% ds_list$dataset & 
-                              value_round < 20 ) %>% 
-	group_by(model,.metric) %>%
+# t_df %>% dplyr::filter(.metric %in% c('mase','mape','smape','rmse') & 
+#                               dataset %in% ds_list$dataset & 
+#                               value_round < 20 ) %>% 
+	t_df %>% group_by(model,.metric) %>%
 	summarise_at(vars(value_round), list(avg_value = mean)) %>%
 	ggplot(aes(x=model, y=avg_value, fill=model)) + 
 		geom_bar(stat = 'identity', width=0.3,position=position_dodge()) +
-		facet_wrap(vars(.metric),scales = "free", ncol = 4) +
+		facet_wrap(vars(.metric),scales = "free", ncol = 2) +
 		ggtitle("Model Performance (MASE/MAPE/SMAPE Avg)")
+	
+	
+#result_df %>% dplyr::filter(.metric %in% c('mase','smape') & dataset %in% ds_list$dataset ) %>% 
+#result_df %>% dplyr::filter(.metric %in% c('mase','mape','smape','rmse') & dataset %in% ds_list$dataset ) %>% 
+  t_df %>% ggplot(aes(x=reorder(model,value_round), y=value_round, fill=model)) +
+  	#coord_flip() +
+    geom_boxplot(width=0.3, outlier.colour = NA) +
+  	stat_summary(fun="mean", size=1, geom = "point", aes(color="Mean"))+
+  	stat_summary(fun="median", size=1, geom = "point", aes(color="Median"))+
+  	#scale_y_continuous(labels = scales::comma) +
+    facet_wrap(vars(.metric),scales = "free", ncol = 2) +
+  	labs(
+  	    x = 'performance', 
+  	    y = 'model', 
+  	    title = 'Model Performance (MASE/SMAPE)'
+  	)
 
 ```
 
