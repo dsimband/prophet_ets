@@ -1,0 +1,102 @@
+---
+title: "M4-Competition Data"
+author: "David Simbandumwe"
+date: "`r Sys.Date()`"
+output: openintro::lab_report
+---
+
+
+# Setup
+
+```{r init, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+rm(list=ls())
+
+```
+
+
+
+
+```{r}
+
+library(dplyr)
+#library(plyr)
+library(tidyverse)
+library(tsibble)
+library(M4comp2018)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+set.seed(808)
+test.size <- 5
+M_M4 <- Filter(function(l) l$type == "Industry", M4)
+n.m4 <- length(M_M4)
+indices.m4 <- sample(x=n.m4, size=test.size, replace=FALSE)
+
+
+```
+
+
+
+
+```{r}
+
+M_M4[[2]]$period
+
+
+
+
+tb <- as_tsibble(M_M4[[2]]$x)
+
+```
+
+
+
+
+
+```{r}
+
+for (d_set in M_M4[indices.m4]) {
+
+  
+  
+  
+}
+
+
+```
+
+
+
+
+```{r}
+
+data(M4)
+df <- data.frame(matrix(ncol = 5, nrow = 100000))
+colnames(df) <- c( "st", "n", "type", "h", "period")
+df$st     <- unlist(Map(function(l) { as.character(l$st[[1]][1]) }, M4))
+df$n      <- unlist(Map(function(l) { c(l$n[[1]][1]) }, M4))
+df$type   <- unlist(Map(function(l) { as.character(l$type[[1]][1]) }, M4))
+df$h      <- unlist(Map(function(l) { c(l$h[[1]][1]) }, M4))
+df$period <- unlist(Map(function(l) { as.character(l$period[[1]][1]) }, M4))
+M4.Summary <- df
+rm(df, M4)
+
+```
+
+
+
+
+

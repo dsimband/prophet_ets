@@ -171,6 +171,36 @@ prophetModel <- function(train_tb,train_rows, test_rows, new_data) {
 }
 
 
+#' etsModel
+#'
+#' @param train_tb 
+#' @param train_rows 
+#' @param test_rows 
+#' @param new_data 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+etsModel <- function(train_tb,train_rows, test_rows, new_data) {
+
+  # train model
+  fit <- train_tb %>% model(ets = ETS(y))
+
+  # predict
+  fc <- fit %>% forecast(new_data = new_data)
+  
+  
+  data_df <- data.frame(
+    y =fc$.mean,
+    actual = new_data$y,
+    ds = new_data$ds
+  )
+	
+	return(data_df)
+  
+}
+
 
 
 #' arimaModel
@@ -378,6 +408,12 @@ for (d_set in M_M4[indices.m4]) {
   final_results_df <- bind_rows(final_results_df, perfMetrics)
   plotResults(train_tb, data_ets, 'ets_xls', d_set$st, d_set$n, perfMetrics)
   
+  # ETS
+  data_ets <- etsModel(train_tb,train_rows, test_rows, new_data)
+  perfMetrics <- calculateMetrics(data_ets, 'ETS', d_set$st, multi_metric)
+  final_results_df <- bind_rows(final_results_df, perfMetrics)
+  plotResults(train_tb, data_ets, 'ETS', d_set$st, d_set$n, perfMetrics)  
+  
   
   # ARIMA
   data_arima <- arimaModel(train_tb,train_rows, test_rows, new_data)
@@ -464,7 +500,12 @@ ggplot(aes(x=model, y=value_round, fill=model)) +
 	geom_bar(stat = 'identity', width=0.3, position=position_dodge()) +
 	facet_wrap(vars(dataset),scales = "free", ncol = 3) +
 	coord_flip() +
-	ggtitle("Model Performance (RMSE)")
+  labs(
+	    x = 'model', 
+	    y = 'rmse', 
+	    title = 'Model Performance (RMSE)'
+	)
+
 
 
 result_df %>% dplyr::filter(.metric %in% c('mase')) %>%
@@ -472,7 +513,11 @@ ggplot(aes(x=model, y=value_round, fill=model)) +
 	geom_bar(stat = 'identity', width=0.3, position=position_dodge()) +
 	facet_wrap(vars(dataset),scales = "free", ncol = 3) +
 	coord_flip() +
-	ggtitle("Model Performance (MASE)")
+  labs(
+	    x = 'model', 
+	    y = 'mase', 
+	    title = 'Model Performance (MASE)'
+	)
 
 
 result_df %>% dplyr::filter(.metric %in% c('mape')) %>%
@@ -480,7 +525,12 @@ ggplot(aes(x=model, y=value_round, fill=model)) +
 	geom_bar(stat = 'identity', width=0.3, position=position_dodge()) +
 	facet_wrap(vars(dataset),scales = "free", ncol = 3) +
 	coord_flip() +
-	ggtitle("Model Performance (MAPE)")
+  labs(
+	    x = 'model', 
+	    y = 'mape', 
+	    title = 'Model Performance (MAPE)'
+	)
+
 
 
 result_df %>% dplyr::filter(.metric %in% c('mase','mape','smape','rmse') ) %>% 
@@ -489,7 +539,12 @@ result_df %>% dplyr::filter(.metric %in% c('mase','mape','smape','rmse') ) %>%
 	ggplot(aes(x=model, y=avg_value, fill=model)) + 
 		geom_bar(stat = 'identity', width=0.3,position=position_dodge()) +
 		facet_wrap(vars(.metric),scales = "free", ncol = 4) +
-		ggtitle("Model Performance (MASE/MAPE/SMAPE Avg)")
+    labs(
+  	    x = 'model', 
+  	    y = 'performance', 
+  	    title = 'Model Performance (MASE/MAPE/SMAPE Avg)'
+  	)
+
 
 
 ```

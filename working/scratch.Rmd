@@ -180,11 +180,13 @@ saveWorkbook(wb, file = fileName, overwrite = TRUE)
 
 library(fable)
 library(fabletools)
-library(prophet)
+library(fable.prophet)
 
 
 # train model
 fit <- train_tb %>% model(fprophet = fable.prophet::prophet(y, algorithm='LBFGS'))
+#fit <- train_tb %>% model(fprophet = fable.prophet::prophet(y, algorithm='Newton'))
+
 
 # predict
 fc <- fit %>% forecast(new_data = new_data)
