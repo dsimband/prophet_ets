@@ -243,7 +243,6 @@ arimaModel <- function(train_tb,train_rows, test_rows, new_data) {
 
 
 
-
 ```{r}
 
 # create workbook for Excel ETS Models
@@ -598,7 +597,7 @@ result_df %>% dplyr::filter(.metric %in% c('mase','smape') & dataset %in% ds_lis
 
 result_df %>% dplyr::filter(.metric %in% c('mase','smape') & dataset %in% ds_list$dataset ) %>% 
 #result_df %>% dplyr::filter(.metric %in% c('mase','mape','smape','rmse') & dataset %in% ds_list$dataset ) %>% 
-  ggplot(aes(x=reorder(model,value_round), y=value_round, fill=model)) +
+  ggplot(aes(x=reorder(model,value_round), y=value_round)) +
   	#coord_flip() +
     geom_boxplot(width=0.3) +
   	stat_summary(fun="mean", size=1, geom = "point", aes(color="Mean"))+
@@ -666,7 +665,7 @@ ggplot(aes(x=model, y=value_round, fill=model)) +
 r_df <- result_df
 r_df$freq <- substr(result_df$dataset, 1, 1) 
 r_df <- r_df %>% group_by(model,freq,.metric) %>% summarise(mean = mean(.estimate)) %>% dplyr::filter(.metric == 'smape')
-r_df$project <- 'ds'
+r_df$project <- 'analysis findings'
 r_df$model[r_df$model == 'ets_xls'] <- 'ETS'
 
   
@@ -676,7 +675,7 @@ r_m4_df <- data.frame(
             '.metric'= c('smape','smape','smape','smape','smape','smape','smape','smape','smape','smape'),
             'mean'= c(3.193,8.653,13.443,10.431,15.168,3.046,8.727,13.525,10.291,15.356)
 )
-r_m4_df$project <- 'm4'
+r_m4_df$project <- 'm4 results'
 
 
 
@@ -691,7 +690,7 @@ r_df %>% dplyr::filter(freq %in% c('M','Q','Y') & !model %in% c('prophet') ) %>%
 		ggtitle("Model Performance vs M4")
 
 
-r_df %>% dplyr::filter(project == 'ds') %>%
+r_df %>% dplyr::filter(project == 'analysis findings') %>%
 	ggplot(aes(x=model, y=mean, fill=model)) + 
 		geom_bar(stat = 'identity', width=0.3,position=position_dodge()) +
 		facet_wrap(vars(freq),scales = "free", ncol = 4) +
